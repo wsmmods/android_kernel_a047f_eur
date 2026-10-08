@@ -1,4 +1,4 @@
-name: Build A04s v3 KALLSYMS_ALL
+name: Build A04s Custom WSM
 
 on:
   workflow_dispatch:
@@ -24,36 +24,47 @@ jobs:
         run: |
           sed -i '/make ${ARGS} menuconfig/d' build.sh
 
-      - name: Force KALLSYMS_ALL
+      - name: Configure kernel
         run: |
-          sed -i 's/^CONFIG_KALLSYMS_ALL=.*/CONFIG_KALLSYMS_ALL=y/' arch/arm64/configs/a04s.config
-          printf '\nCONFIG_DEBUG_KERNEL=y\n' >> arch/arm64/configs/a04s.config
+          sed -i '/^CONFIG_KALLSYMS_ALL=/d' arch/arm64/configs/a04s.config
+          sed -i '/^CONFIG_DEBUG_KERNEL=/d' arch/arm64/configs/a04s.config
+          sed -i '/^CONFIG_LOCALVERSION=/d' arch/arm64/configs/a04s.config
+
+          echo 'CONFIG_KALLSYMS_ALL=y' >> arch/arm64/configs/a04s.config
+          echo 'CONFIG_DEBUG_KERNEL=y' >> arch/arm64/configs/a04s.config
+          echo 'CONFIG_LOCALVERSION="-Custom-WSM"' >> arch/arm64/configs/a04s.config
 
       - name: Build kernel
         run: |
           chmod +x build.sh
-          BUILD_KERNEL_VERSION=kallsyms ./build.sh
+          BUILD_KERNEL_VERSION=Custom-WSM ./build.sh
 
       - name: Verify final configuration
         run: |
-          echo "Checking final configuration..."
-          grep -E '^CONFIG_(KALLSYMS|DEBUG_KERNEL|KALLSYMS_ALL)=' out/.config
+          echo "Checking final kernel configuration..."
+
+          grep -E '^CONFIG_(KALLSYMS|DEBUG_KERNEL|LOCALVERSION)=' out/.config
 
           grep -q '^CONFIG_KALLSYMS_ALL=y$' out/.config
+          grep -q '^CONFIG_DEBUG_KERNEL=y$' out/.config
+          grep -q '^CONFIG_LOCALVERSION="-Custom-WSM"$' out/.config
+
           echo "CONFIG_KALLSYMS_ALL=y confirmed."
+          echo "CONFIG_DEBUG_KERNEL=y confirmed."
+          echo "CONFIG_LOCALVERSION=-Custom-WSM confirmed."
 
-      - name: List build output
+      - name: Verify kernel image
         run: |
-          echo "Build directory:"
-          ls -lah build/
-
           echo "Kernel image:"
-          ls -lah out/arch/arm64/boot/Image
+          ls -lh out/arch/arm64/boot/Image
+
+          echo "Build directory:"
+          ls -lh build/
 
       - name: Upload kernel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: A04s-v3-KALLSYMS-ALL
+          name: A04s-4.19.198-Custom-WSM
           path: |
             build/*.tar
             out/arch/arm64/boot/Image

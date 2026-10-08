@@ -8,32 +8,52 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout v3
+      - name: Checkout source
         uses: actions/checkout@v4
         with:
-          ref: v3
-          submodules: recursive
-          fetch-depth: 1
+          ref: sus
+          fetch-depth: 0
+
+      - name: Switch to v3
+        run: |
+          git checkout 45ba5ed
+          git status
+          git describe --tags --always
+
+      - name: Prepare build script
+        run: |
+          sed -i '/make ${ARGS} menuconfig/d' build.sh
+
+      - name: Force KALLSYMS_ALL
+        run: |
+          sed -i 's/^CONFIG_KALLSYMS_ALL=.*/CONFIG_KALLSYMS_ALL=y/' arch/arm64/configs/a04s.config
+          printf '\nCONFIG_DEBUG_KERNEL=y\n' >> arch/arm64/configs/a04s.config
 
       - name: Build kernel
         run: |
           chmod +x build.sh
           BUILD_KERNEL_VERSION=kallsyms ./build.sh
 
-      - name: Verify KALLSYMS_ALL
+      - name: Verify final configuration
         run: |
-          echo "Checking final kernel configuration..."
+          echo "Checking final configuration..."
           grep -E '^CONFIG_(KALLSYMS|DEBUG_KERNEL|KALLSYMS_ALL)=' out/.config
 
-          grep -q '^CONFIG_KALLSYMS_ALL=y$' out/.config || {
-            echo "ERROR: CONFIG_KALLSYMS_ALL is not enabled!"
-            exit 1
-          }
+          grep -q '^CONFIG_KALLSYMS_ALL=y$' out/.config
+          echo "CONFIG_KALLSYMS_ALL=y confirmed."
 
-      - name: Upload build
+      - name: List build output
+        run: |
+          echo "Build directory:"
+          ls -lah build/
+
+          echo "Kernel image:"
+          ls -lah out/arch/arm64/boot/Image
+
+      - name: Upload kernel artifacts
         uses: actions/upload-artifact@v4
         with:
           name: A04s-v3-KALLSYMS-ALL
           path: |
-            build/*
+            build/*.tar
             out/arch/arm64/boot/Image

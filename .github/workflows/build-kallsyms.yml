@@ -1,0 +1,39 @@
+name: Build A04s v3 KALLSYMS_ALL
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout v3
+        uses: actions/checkout@v4
+        with:
+          ref: v3
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Build kernel
+        run: |
+          chmod +x build.sh
+          BUILD_KERNEL_VERSION=kallsyms ./build.sh
+
+      - name: Verify KALLSYMS_ALL
+        run: |
+          echo "Checking final kernel configuration..."
+          grep -E '^CONFIG_(KALLSYMS|DEBUG_KERNEL|KALLSYMS_ALL)=' out/.config
+
+          grep -q '^CONFIG_KALLSYMS_ALL=y$' out/.config || {
+            echo "ERROR: CONFIG_KALLSYMS_ALL is not enabled!"
+            exit 1
+          }
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: A04s-v3-KALLSYMS-ALL
+          path: |
+            build/*
+            out/arch/arm64/boot/Image
